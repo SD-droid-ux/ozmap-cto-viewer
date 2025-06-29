@@ -1,49 +1,64 @@
 import streamlit as st
 import requests
+import json
 
+# Configurações da página
 st.set_page_config(page_title="🔎 Buscar CTO no Ozmap", layout="centered")
-
 st.title("🔌 Consulta de CTOs via Ozmap API (com chave API)")
 
-st.markdown("""
-Insira sua **API Key** gerada no Ozmap e o **nome exato da CTO** para buscar localização.
-""")
+st.markdown("Insira sua **API Key** e o **nome da CTO (box)** para buscar localização no Ozmap.")
 
-# Campos de entrada
+# Entradas do usuário
 api_key = st.text_input("🔑 API Key Ozmap", type="password")
-cto_input = st.text_input("📡 Nome da CTO (ex: FLA27-0118)")
+cto_input = st.text_input("📦 Nome da CTO (ex: NTL06-570)")
 
+# Quando clicar no botão
 if st.button("🔍 Buscar CTO"):
     if not api_key or not cto_input:
-        st.warning("Preencha os campos acima.")
+        st.warning("Preencha todos os campos acima.")
     else:
-        # URL correta da API
-        cto_url = f"https://sandbox.ozmap.com.br:8994/api/v2/ctos?name={cto_input}"
-        headers = {"Authorization": api_key}
+        # Monta o filtro no formato exigido pela API
+        filtro = json.dumps([{
+            "property": "name",
+            "operator": "=",
+            "value": cto_input
+        }])
+
+        # URL da API com filtro aplicado
+        url = f"https://sandbox.ozmap.com.br:8994/api/v2/boxes?filter={filtro}"
+
+        # Cabeçalho com a chave da API
+        headers = {
+            "Authorization": api_key
+        }
 
         try:
-            res = requests.get(cto_url, headers=headers, timeout=10)
+            # Requisição com timeout de 60 segundos
+            response = requests.get(url, headers=headers, timeout=60)
 
-            if res.status_code == 200:
-                ctos = res.json()
+            if response.status_code == 200:
+                data = response.json()
 
-                if isinstance(ctos, list) and len(ctos) > 0:
-                    resultado = ctos[0]
+                if data:
+                    box = data[0]
                     st.success("✅ CTO encontrada!")
-                    st.write(f"📍 **Cidade:** {resultado.get('city')}")
-                    st.write(f"🌐 **Latitude:** {resultado.get('latitude')}")
-                    st.write(f"🌐 **Longitude:** {resultado.get('longitude')}")
 
-                    if resultado.get("latitude") and resultado.get("longitude"):
-                        st.map(data=[{
-                            "lat": resultado.get("latitude"),
-                            "lon": resultado.get("longitude")
+                    st.write(f"📍 **Cidade:** {box.get('city', 'Não informado')}")
+                    st.write(f"🌐 **Latitude:** {box.get('latitude', 'Não informado')}")
+                    st.write(f"🌐 **Longitude:** {box.get('longitude', 'Não informado')}")
+
+                    if box.get("latitude") and box.get("longitude"):
+                        st.map([{
+                            "lat": box["latitude"],
+                            "lon": box["longitude"]
                         }])
+                    else:
+                        st.info("Localização indisponível para essa CTO.")
                 else:
-                    st.warning("CTO não encontrada. Verifique o nome exato.")
+                    st.warning("CTO não encontrada. Verifique se o nome está correto.")
             else:
-                st.error(f"Erro {res.status_code}: não foi possível acessar a API.")
-                st.text(res.text)
+                st.error(f"Erro {response.status_code}: não foi possível buscar a CTO.")
+                st.text(response.text)
 
         except requests.exceptions.RequestException as e:
             st.error("Erro de conexão com a API Ozmap.")
