@@ -4,62 +4,61 @@ import json
 
 # Configurações da página
 st.set_page_config(page_title="🔎 Buscar CTO no Ozmap", layout="centered")
-st.title("🔌 Consulta de CTOs via Ozmap API (com chave API)")
+st.title("🔌 Consulta de CTOs via Ozmap API")
 
-st.markdown("Insira sua **API Key** e o **nome da CTO (box)** para buscar localização no Ozmap.")
+st.markdown("Insira sua **API Key** e o **nome da CTO** para buscar sua localização.")
 
-# Entradas do usuário
+# Entrada da chave e nome
 api_key = st.text_input("🔑 API Key Ozmap", type="password")
-cto_input = st.text_input("📦 Nome da CTO (ex: NTL06-570)")
+cto_name = st.text_input("📦 Nome da CTO (ex: NTL06-570)")
 
-# Quando clicar no botão
+# Ação ao clicar no botão
 if st.button("🔍 Buscar CTO"):
-    if not api_key or not cto_input:
-        st.warning("Preencha todos os campos acima.")
+    if not api_key or not cto_name:
+        st.warning("Preencha todos os campos.")
     else:
-        # Monta o filtro no formato exigido pela API
-        filtro = json.dumps([{
-            "property": "name",
-            "operator": "=",
-            "value": cto_input
-        }])
+        filtro = json.dumps([
+            {
+                "property": "name",
+                "operator": "=",
+                "value": cto_name
+            }
+        ])
 
-        # URL da API com filtro aplicado
-        url = f"https://sandbox.ozmap.com.br:8994/api/v2/boxes?filter={filtro}"
+        # URL do ambiente sandbox
+        url = f"https://sandbox.ozmap.com.br:9994/api/v2/boxes?filter={filtro}"
 
-        # Cabeçalho com a chave da API
         headers = {
-            "Authorization": api_key
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json"
         }
 
         try:
-            # Requisição com timeout de 60 segundos
-            response = requests.get(url, headers=headers, timeout=60)
+            response = requests.get(url, headers=headers, timeout=30)
 
             if response.status_code == 200:
-                data = response.json()
+                ctos = response.json()
 
-                if data:
-                    box = data[0]
-                    st.success("✅ CTO encontrada!")
-
-                    st.write(f"📍 **Cidade:** {box.get('city', 'Não informado')}")
-                    st.write(f"🌐 **Latitude:** {box.get('latitude', 'Não informado')}")
-                    st.write(f"🌐 **Longitude:** {box.get('longitude', 'Não informado')}")
-
-                    if box.get("latitude") and box.get("longitude"):
-                        st.map([{
-                            "lat": box["latitude"],
-                            "lon": box["longitude"]
-                        }])
-                    else:
-                        st.info("Localização indisponível para essa CTO.")
+                if ctos:
+                    st.success(f"✅ {len(ctos)} CTO(s) encontrada(s) com esse nome.")
+                    for i, box in enumerate(ctos):
+                        st.markdown(f"### CTO {i + 1}")
+                        st.write(f"📍 **Cidade:** {box.get('city', 'Não informado')}")
+                        st.write(f"🌐 **Latitude:** {box.get('latitude', 'Não informado')}")
+                        st.write(f"🌐 **Longitude:** {box.get('longitude', 'Não informado')}")
+                        
+                        if box.get("latitude") and box.get("longitude"):
+                            st.map([{
+                                "lat": box["latitude"],
+                                "lon": box["longitude"]
+                            }])
+                        else:
+                            st.info("CTO encontrada, mas sem coordenadas geográficas.")
                 else:
-                    st.warning("CTO não encontrada. Verifique se o nome está correto.")
+                    st.warning("Nenhuma CTO com esse nome foi encontrada.")
             else:
-                st.error(f"Erro {response.status_code}: não foi possível buscar a CTO.")
+                st.error(f"Erro {response.status_code}: {response.reason}")
                 st.text(response.text)
-
         except requests.exceptions.RequestException as e:
-            st.error("Erro de conexão com a API Ozmap.")
+            st.error("Erro de conexão com a API do Ozmap.")
             st.text(str(e))
